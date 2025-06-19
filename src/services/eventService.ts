@@ -1,6 +1,7 @@
 import { EventAggregator } from './eventAggregator'
 import { TicketmasterProvider } from './providers/ticketmasterProvider'
 import { MeetupProvider } from './providers/meetupProvider'
+import { EventbriteProvider } from './providers/eventbriteProvider'
 import type { Event } from '@/types/event'
 import type { EventSearchParams } from '@/types/eventProvider'
 
@@ -10,8 +11,9 @@ class EventService {
   constructor() {
     // Initialize providers in priority order
     const providers = [
-      new TicketmasterProvider(),
-      new MeetupProvider()
+      new TicketmasterProvider(),  // Priority 100
+      new EventbriteProvider(),    // Priority 90
+      new MeetupProvider()         // Priority 80
     ]
 
     this.aggregator = new EventAggregator({

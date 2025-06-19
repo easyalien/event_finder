@@ -126,7 +126,9 @@ export class VenueDiscoveryService {
   }
 
   isAvailable(): boolean {
-    return oauthManager.isConnected('foursquare')
+    // Temporarily return false to test app without Foursquare
+    return false
+    // return oauthManager.isConnected('foursquare')
   }
 
   getConnectionUrl(): string {

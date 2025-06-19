@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import EventCard from '@/components/EventCard'
 import TimeFilter from '@/components/TimeFilter'
-import { eventService } from '@/services/eventService'
+import OAuthConnections from '@/components/OAuthConnections'
 import type { Event } from '@/types/event'
 
 export default function EventsPage() {
@@ -36,9 +36,24 @@ export default function EventsPage() {
           radius: parseInt(distance)
         }
         
-        const result = await eventService.searchEvents(searchParams)
+        // Set date range to get events for next 3 months
+        const startDate = new Date().toISOString()
+        const endDate = new Date()
+        endDate.setMonth(endDate.getMonth() + 3)
+        const endDateString = endDate.toISOString()
+        
+        // Call the API route instead of eventService directly
+        const response = await fetch(
+          `/api/events?postalCode=${zip}&radius=${distance}&startDateTime=${startDate}&endDateTime=${endDateString}`
+        )
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch events')
+        }
+        
+        const result = await response.json()
         setEvents(result.events)
-        setDataSources(eventService.getAvailableProviders())
+        setDataSources(result.sources || [])
       } catch (err) {
         console.error('Error fetching events:', err)
         setError('Failed to load events. Please try again.')
@@ -53,10 +68,43 @@ export default function EventsPage() {
 
   useEffect(() => {
     if (events.length > 0) {
-      const filtered = eventService.getEventsByTimeframe(events, timeframe)
+      const filtered = getEventsByTimeframe(events, timeframe)
       setFilteredEvents(filtered)
+    } else {
+      setFilteredEvents([])
     }
   }, [events, timeframe])
+
+  const getEventsByTimeframe = (events: Event[], timeframe: string): Event[] => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    return events.filter(event => {
+      const eventDate = new Date(event.date)
+      
+      switch (timeframe) {
+        case 'today':
+          return eventDate >= today && eventDate < new Date(today.getTime() + 24 * 60 * 60 * 1000)
+        
+        case 'week':
+          const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+          return eventDate >= today && eventDate <= weekFromNow
+        
+        case 'month':
+          const monthFromNow = new Date(today)
+          monthFromNow.setMonth(today.getMonth() + 1)
+          return eventDate >= today && eventDate <= monthFromNow
+        
+        case '3months':
+          const threeMonthsFromNow = new Date(today)
+          threeMonthsFromNow.setMonth(today.getMonth() + 3)
+          return eventDate >= today && eventDate <= threeMonthsFromNow
+        
+        default:
+          return true
+      }
+    })
+  }
 
   if (!zip || !distance) {
     return null
@@ -90,6 +138,8 @@ export default function EventsPage() {
           
           <TimeFilter currentTimeframe={timeframe} onTimeframeChange={setTimeframe} />
         </div>
+
+        <OAuthConnections />
 
         <div className="space-y-4">
           {loading ? (

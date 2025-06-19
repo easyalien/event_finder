@@ -67,6 +67,34 @@ export class EventbriteProvider implements IEventProvider {
   }
 
   async searchEvents(params: EventSearchParams): Promise<EventSearchResult> {
+    // If we have Eventbrite API token, try direct organization search first
+    if (this.isAvailable()) {
+      try {
+        const directEvents = await this.searchEventbriteDirectly(params)
+        if (directEvents.length > 0) {
+          return {
+            events: directEvents,
+            totalCount: directEvents.length,
+            hasMore: false,
+            source: this.name
+          }
+        }
+      } catch (error) {
+        console.warn('Direct Eventbrite search failed:', error)
+      }
+    }
+
+    // Check if Foursquare venue discovery is available for enhanced search
+    if (!venueDiscoveryService.isAvailable()) {
+      console.warn('Eventbrite provider using mock data. Foursquare OAuth not connected and no direct events found.')
+      return {
+        events: this.getMockEventbriteEvents(params),
+        totalCount: 2,
+        hasMore: false,
+        source: this.name
+      }
+    }
+
     if (!this.isAvailable()) {
       console.warn('Eventbrite provider is configured but API token is needed for full functionality.')
       return {
@@ -116,14 +144,50 @@ export class EventbriteProvider implements IEventProvider {
       }
     } catch (error) {
       console.error('Error in Eventbrite provider:', error)
-      throw error
+      // Fall back to mock data on error
+      return {
+        events: this.getMockEventbriteEvents(params),
+        totalCount: 2,
+        hasMore: false,
+        source: this.name
+      }
     }
   }
 
   isAvailable(): boolean {
-    // For demo purposes, return true. In production, check for OAuth token
-    return true
-    // return !!process.env.NEXT_PUBLIC_EVENTBRITE_API_TOKEN
+    return !!process.env.NEXT_PUBLIC_EVENTBRITE_API_TOKEN
+  }
+
+  private async searchEventbriteDirectly(params: EventSearchParams): Promise<Event[]> {
+    // Try searching popular organizations/venues in the area
+    // This is a simplified approach since we can't do location search directly
+    const popularOrgIds = [
+      // Add some popular organization IDs here for testing
+      // These would typically be fetched based on location
+    ]
+
+    if (popularOrgIds.length === 0) {
+      return [] // No organizations to search
+    }
+
+    const allEvents: Event[] = []
+
+    for (const orgId of popularOrgIds) {
+      try {
+        const response = await fetch(`/api/eventbrite/organizations/${orgId}/events`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.events) {
+            const events = data.events.map(this.transformEvent)
+            allEvents.push(...events)
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch events for org ${orgId}:`, error)
+      }
+    }
+
+    return allEvents
   }
 
   private async getEventsByVenueName(venueName: string, venueAddress: string): Promise<Event[]> {

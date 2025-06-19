@@ -2,6 +2,10 @@ import { EventAggregator } from './eventAggregator'
 import { TicketmasterProvider } from './providers/ticketmasterProvider'
 import { MeetupProvider } from './providers/meetupProvider'
 import { EventbriteProvider } from './providers/eventbriteProvider'
+import { SeatGeekProvider } from './providers/seatgeekProvider'
+import { BandsinTownProvider } from './providers/bandsintown'
+import { YelpProvider } from './providers/yelpProvider'
+import { ArtInstituteProvider } from './providers/artInstituteProvider'
 import type { Event } from '@/types/event'
 import type { EventSearchParams } from '@/types/eventProvider'
 
@@ -13,7 +17,11 @@ class EventService {
     const providers = [
       new TicketmasterProvider(),  // Priority 100
       new EventbriteProvider(),    // Priority 90
-      new MeetupProvider()         // Priority 80
+      new SeatGeekProvider(),      // Priority 85
+      new MeetupProvider(),        // Priority 80
+      new BandsinTownProvider(),   // Priority 75
+      new YelpProvider(),          // Priority 70
+      new ArtInstituteProvider()   // Priority 65
     ]
 
     this.aggregator = new EventAggregator({

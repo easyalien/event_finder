@@ -24,6 +24,22 @@ export default function EventCard({ event }: EventCardProps) {
     })
   }
 
+  const getEventSource = (eventId: string) => {
+    // Extract source from event ID prefix
+    const sourceMap: Record<string, string> = {
+      'tm': 'Ticketmaster',
+      'eb': 'Eventbrite', 
+      'sg': 'SeatGeek',
+      'meetup': 'Meetup',
+      'bt': 'Bandsintown',
+      'yelp': 'Yelp',
+      'aic': 'Art Institute'
+    }
+    
+    const prefix = eventId.split('_')[0]
+    return sourceMap[prefix] || 'Unknown'
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-3">
@@ -55,6 +71,7 @@ export default function EventCard({ event }: EventCardProps) {
       
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-500">Distance: {event.distance} miles</span>
+        <span className="text-gray-500">Source: {getEventSource(event.id)}</span>
       </div>
     </div>
   )

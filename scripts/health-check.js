@@ -50,15 +50,21 @@ async function checkEventbrite() {
   }
 
   try {
-    const url = `https://www.eventbriteapi.com/v3/events/search/?location.address=90210&location.within=25mi&page_size=5`
+    // Eventbrite approach: Uses Foursquare to find venues, then searches each venue
+    // Test with a simple categories endpoint (doesn't require user access)
+    const url = `https://www.eventbriteapi.com/v3/categories/`
     const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
     
     if (response.ok) {
       const data = await response.json()
-      const eventCount = data.events?.length || 0
-      return { name: 'Eventbrite', status: 'success', eventCount, source: 'Live API' }
+      return { 
+        name: 'Eventbrite', 
+        status: 'limited_access', 
+        eventCount: 'Token valid', 
+        source: 'Requires Foursquare OAuth for venue discovery' 
+      }
     } else {
       return { name: 'Eventbrite', status: 'error', error: `${response.status} ${response.statusText}` }
     }
@@ -96,8 +102,8 @@ async function checkYelp() {
   }
 
   try {
-    // Yelp doesn't have a dedicated events endpoint, so we'll test the business search
-    const url = `https://api.yelp.com/v3/businesses/search?location=90210&radius=40233&limit=5`
+    // Test Yelp Events API with proper coordinates
+    const url = `https://api.yelp.com/v3/events?latitude=34.0522&longitude=-118.2437&limit=5`
     const response = await fetch(url, {
       headers: { 
         'Authorization': `Bearer ${apiKey}`,
@@ -107,10 +113,30 @@ async function checkYelp() {
     
     if (response.ok) {
       const data = await response.json()
-      const businessCount = data.businesses?.length || 0
-      return { name: 'Yelp', status: 'success', eventCount: businessCount, source: 'Live API (businesses)' }
+      const eventCount = data.events?.length || 0
+      return { name: 'Yelp', status: 'success', eventCount, source: 'Live API (events)' }
     } else {
-      return { name: 'Yelp', status: 'error', error: `${response.status} ${response.statusText}` }
+      // If events API fails, test business search as fallback
+      const businessUrl = `https://api.yelp.com/v3/businesses/search?latitude=34.0522&longitude=-118.2437&radius=25000&limit=5`
+      const businessResponse = await fetch(businessUrl, {
+        headers: { 
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (businessResponse.ok) {
+        const businessData = await businessResponse.json()
+        const businessCount = businessData.businesses?.length || 0
+        return { 
+          name: 'Yelp', 
+          status: 'limited_access', 
+          eventCount: businessCount, 
+          source: 'Events API failed, businesses API works' 
+        }
+      } else {
+        return { name: 'Yelp', status: 'error', error: `Events: ${response.status}, Businesses: ${businessResponse.status}` }
+      }
     }
   } catch (error) {
     return { name: 'Yelp', status: 'error', error: error.message }
@@ -322,6 +348,9 @@ async function main() {
     } else if (result.status === 'success_with_oauth') {
       log(`✅ ${result.name}: ${result.eventCount} items found`, colors.green)
       log(`   Source: ${result.source}`, colors.reset)
+    } else if (result.status === 'limited_access') {
+      log(`⚠️  ${result.name}: ${result.eventCount}`, colors.yellow)
+      log(`   Source: ${result.source}`, colors.reset)
     } else if (result.status === 'oauth_ready') {
       log(`🔗 ${result.name}: OAuth configured`, colors.yellow)
       log(`   Source: ${result.source}`, colors.reset)
@@ -339,11 +368,13 @@ async function main() {
   log('==========', colors.blue)
   
   const successful = results.filter(r => r.status === 'success' || r.status === 'success_with_oauth')
+  const limitedAccess = results.filter(r => r.status === 'limited_access')
   const oauthReady = results.filter(r => r.status === 'oauth_ready')
   const unavailable = results.filter(r => r.status === 'unavailable')
   const errors = results.filter(r => r.status === 'error')
   
   log(`✅ Working: ${successful.length}/${results.length}`, colors.green)
+  log(`⚠️  Limited: ${limitedAccess.length}`, colors.yellow)
   log(`🔗 OAuth Ready: ${oauthReady.length}`, colors.yellow)
   log(`❌ Errors: ${errors.length}`, colors.red)
   log(`🔒 Unavailable: ${unavailable.length}`, colors.yellow)
@@ -358,6 +389,11 @@ async function main() {
   if (withOAuth.length > 0) {
     log('\nServices with OAuth capabilities:', colors.yellow)
     withOAuth.forEach(r => log(`  - ${r.name}: ${r.source}`, colors.yellow))
+  }
+
+  if (limitedAccess.length > 0) {
+    log('\nLimited functionality providers:', colors.yellow)
+    limitedAccess.forEach(r => log(`  - ${r.name}: ${r.source}`, colors.yellow))
   }
 
   if (oauthReady.length > 0) {

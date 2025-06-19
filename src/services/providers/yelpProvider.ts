@@ -94,15 +94,60 @@ export class YelpProvider implements IEventProvider {
         searchParams.append('end_date', endTimestamp.toString())
       }
 
-      const response = await fetch(`${this.baseUrl}/events?${searchParams}`, {
+      // Try events API first
+      const eventsResponse = await fetch(`${this.baseUrl}/events?${searchParams}`, {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Accept': 'application/json'
         }
       })
 
-      if (!response.ok) {
-        console.warn(`Yelp API error: ${response.status} ${response.statusText}, falling back to mock data`)
+      if (eventsResponse.ok) {
+        const data: YelpEventsResponse = await eventsResponse.json()
+        
+        // Filter events by distance and transform
+        const eventsWithinRadius = data.events.filter(yelpEvent => {
+          const distance = calculateDistance(
+            userLat,
+            userLon,
+            yelpEvent.latitude,
+            yelpEvent.longitude
+          )
+          return distance <= params.radius
+        })
+
+        const events = eventsWithinRadius.map(yelpEvent => 
+          this.transformEvent(yelpEvent, userLat, userLon)
+        )
+
+        return {
+          events,
+          totalCount: data.total,
+          hasMore: data.events.length === (params.size || 20),
+          source: this.name
+        }
+      }
+
+      // If events API fails, fall back to business search for event venues
+      console.warn(`Yelp Events API error: ${eventsResponse.status}, falling back to business search`)
+      
+      const businessSearchParams = new URLSearchParams({
+        latitude: userLat.toString(),
+        longitude: userLon.toString(),
+        radius: Math.min(params.radius * 1609, 40000).toString(),
+        limit: (params.size || 20).toString(),
+        categories: 'eventservices,arts,musicvenues,theaters,festivals'
+      })
+
+      const businessResponse = await fetch(`${this.baseUrl}/businesses/search?${businessSearchParams}`, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Accept': 'application/json'
+        }
+      })
+
+      if (!businessResponse.ok) {
+        console.warn(`Yelp Business API error: ${businessResponse.status} ${businessResponse.statusText}, falling back to mock data`)
         return {
           events: this.getMockYelpEvents(params),
           totalCount: 3,
@@ -111,28 +156,26 @@ export class YelpProvider implements IEventProvider {
         }
       }
 
-      const data: YelpEventsResponse = await response.json()
+      const businessData = await businessResponse.json()
       
-      // Filter events by distance and transform
-      const eventsWithinRadius = data.events.filter(yelpEvent => {
-        const distance = calculateDistance(
-          userLat,
-          userLon,
-          yelpEvent.latitude,
-          yelpEvent.longitude
-        )
-        return distance <= params.radius
-      })
-
-      const events = eventsWithinRadius.map(yelpEvent => 
-        this.transformEvent(yelpEvent, userLat, userLon)
-      )
+      // Transform businesses into event-like objects
+      const businessEvents = businessData.businesses
+        .filter((business: any) => {
+          const distance = calculateDistance(
+            userLat,
+            userLon,
+            business.coordinates.latitude,
+            business.coordinates.longitude
+          )
+          return distance <= params.radius
+        })
+        .map((business: any) => this.transformBusinessToEvent(business, userLat, userLon))
 
       return {
-        events,
-        totalCount: data.total,
-        hasMore: data.events.length === (params.size || 20),
-        source: this.name
+        events: businessEvents,
+        totalCount: businessData.total,
+        hasMore: businessData.businesses.length === (params.size || 20),
+        source: `${this.name} (venues)`
       }
     } catch (error) {
       console.error('Error fetching events from Yelp:', error)
@@ -167,6 +210,30 @@ export class YelpProvider implements IEventProvider {
       address: yelpEvent.location.display_address.join(', '),
       category: this.formatCategory(yelpEvent.category),
       distance: Math.round(distance * 10) / 10 // Round to 1 decimal place
+    }
+  }
+
+  private transformBusinessToEvent = (business: any, userLat: number, userLon: number): Event => {
+    const distance = calculateDistance(
+      userLat,
+      userLon,
+      business.coordinates.latitude,
+      business.coordinates.longitude
+    )
+
+    // Create a mock event for this venue
+    const futureDate = new Date()
+    futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 30) + 1)
+
+    return {
+      id: `yelp_venue_${business.id}`,
+      title: `Events at ${business.name}`,
+      description: `${business.name} - ${business.categories?.[0]?.title || 'Event Venue'} • Check venue for upcoming events • ${business.review_count} reviews • ${business.rating}⭐`,
+      date: futureDate.toISOString(),
+      venue: business.name,
+      address: business.location.display_address.join(', '),
+      category: this.formatBusinessCategory(business.categories),
+      distance: Math.round(distance * 10) / 10
     }
   }
 
@@ -234,6 +301,27 @@ export class YelpProvider implements IEventProvider {
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ')
+  }
+
+  private formatBusinessCategory(categories: any[]): string {
+    if (!categories || categories.length === 0) return 'Entertainment'
+    
+    const primaryCategory = categories[0].title
+    
+    // Map business categories to event categories
+    const categoryMapping: Record<string, string> = {
+      'Music Venues': 'Music',
+      'Theaters': 'Theater',
+      'Art Galleries': 'Arts & Culture',
+      'Museums': 'Arts & Culture',
+      'Event Planning & Services': 'Events',
+      'Bars': 'Nightlife',
+      'Restaurants': 'Food & Drink',
+      'Hotels': 'Venue',
+      'Convention Centers': 'Business'
+    }
+    
+    return categoryMapping[primaryCategory] || 'Entertainment'
   }
 
   private getMockYelpEvents(params: EventSearchParams): Event[] {

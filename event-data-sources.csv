@@ -1,0 +1,24 @@
+Name,Type,URL,Cost,Data Provided,Limitations/Features,API Documentation
+Eventbrite API,API,https://www.eventbrite.com,Free,Event details, ticketing, venue info, attendee data,1000 calls/hour limit,https://www.eventbrite.com/platform/api
+Meetup API,API,https://www.meetup.com,Free,Local group events, member data, event management,No specific rate limits mentioned,Available on Meetup developer portal
+Ticketmaster Discovery API,API,https://developer.ticketmaster.com,Free,230K+ events, venue data, artist info,5000 requests/day,https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
+PredictHQ Events API,API,https://www.predicthq.com,Paid (Premium),Aggregated events from 70+ sources, impact intelligence,Advanced analytics features,https://www.predicthq.com/events/local-events
+Facebook Events (Graph API),API,https://developers.facebook.com,Free,Event details, RSVPs, page events,Requires Facebook app approval,https://developers.facebook.com/docs/graph-api/reference/event/
+Instagram API,API,https://developers.facebook.com,Free,Hashtag-based event discovery, location tags,Business account required,https://developers.facebook.com/docs/instagram-api/
+Foursquare Places API,API,https://foursquare.com/products/places-api/,Freemium ($200 credit),100M+ venues, location context, popularity data,Pay-as-you-go after credits,https://docs.foursquare.com/developer/reference/places-api-overview
+Songkick API,API,https://www.songkick.com/developer,Free,Concert listings, artist events, venue data,Platform partnerships changing,https://www.songkick.com/developer
+Bandsintown,API/Partnership,https://www.artist.bandsintown.com,Free,1.5M+ shows, 600K+ artists, integrated with Spotify,Artist-focused platform,Via Spotify integration
+Last.fm API,API,https://www.last.fm/api,Free,Music events, artist data, user listening history,Music-focused events,https://www.last.fm/api
+ESPN Sports API,API (Limited Public),Various endpoints,Free (Limited),Sports scores, schedules, team data,Unofficial public endpoints only,GitHub: pseudo-r/Public-ESPN-API
+API-Sports,API,https://api-sports.io/,Freemium ($10+/month),Real-time sports data, 15-second updates,Multiple pricing tiers,https://api-sports.io/
+Sportradar API,API,https://sportradar.com,Paid,80+ sports, 500+ leagues, 750K+ events/year,Enterprise-focused pricing,https://developer.sportradar.com
+SportsDataIO,API,https://sportsdata.io,Freemium,Sports data with free replay functionality,Various sport-specific APIs,https://sportsdata.io/developers/apis
+Harvard Art Museums API,API,https://harvardartmuseums.org,Free,Museum exhibitions, events, collections,Academic/research focus,https://github.com/harvardartmuseums/api-docs
+Art Institute of Chicago API,API,https://www.artic.edu/open-access/public-api,Free,Museum events, exhibitions, artwork data,Cultural events included,https://www.artic.edu/open-access/public-api
+Metropolitan Museum API,API,https://metmuseum.github.io/,Free,470K+ artworks, exhibitions, events,Non-commercial/commercial use,https://metmuseum.github.io/
+Cleveland Museum API,API,https://openaccess-api.clevelandart.org/,Free,64K+ artworks, events, exhibitions,Open access focus,https://openaccess-api.clevelandart.org/
+Local Chamber of Commerce Sites,Website Scraping,Varies by location,Free,Community events, business events,Geographic limitations,Contact local chambers directly
+City Government Event Pages,Website Scraping,Varies by municipality,Free,Municipal events, festivals, public gatherings,Location-specific,Check city open data portals
+Evvnt,Website/Syndication,https://evvnt.com,Paid Service,Event syndication to 5500+ sites,Commercial syndication service,Event promotion platform
+Yelp Events,Website Scraping,https://www.yelp.com,Free,Local business events, venue information,Business-focused events,Consider using Yelp Fusion API
+OpenWeatherMap API,API,https://openweathermap.org,Freemium,Weather forecasts, historical data,Rate limits on free tier,https://openweathermap.org/guide

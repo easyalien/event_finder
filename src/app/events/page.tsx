@@ -4,14 +4,18 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import EventCard from '@/components/EventCard'
 import TimeFilter from '@/components/TimeFilter'
-import { mockEvents } from '@/data/mockEvents'
+import { eventService } from '@/services/eventService'
 import type { Event } from '@/types/event'
 
 export default function EventsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [timeframe, setTimeframe] = useState('today')
+  const [events, setEvents] = useState<Event[]>([])
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [dataSources, setDataSources] = useState<string[]>([])
 
   const zip = searchParams.get('zip')
   const distance = searchParams.get('distance')
@@ -22,34 +26,37 @@ export default function EventsPage() {
       return
     }
 
-    const filtered = mockEvents.filter((event) => {
-      const eventDate = new Date(event.date)
-      const today = new Date()
-      const tomorrow = new Date(today)
-      tomorrow.setDate(today.getDate() + 1)
+    const fetchEvents = async () => {
+      setLoading(true)
+      setError(null)
       
-      switch (timeframe) {
-        case 'today':
-          return eventDate.toDateString() === today.toDateString()
-        case 'week':
-          const weekFromNow = new Date(today)
-          weekFromNow.setDate(today.getDate() + 7)
-          return eventDate >= today && eventDate <= weekFromNow
-        case 'month':
-          const monthFromNow = new Date(today)
-          monthFromNow.setMonth(today.getMonth() + 1)
-          return eventDate >= today && eventDate <= monthFromNow
-        case '3months':
-          const threeMonthsFromNow = new Date(today)
-          threeMonthsFromNow.setMonth(today.getMonth() + 3)
-          return eventDate >= today && eventDate <= threeMonthsFromNow
-        default:
-          return true
+      try {
+        const searchParams = {
+          postalCode: zip,
+          radius: parseInt(distance)
+        }
+        
+        const result = await eventService.searchEvents(searchParams)
+        setEvents(result.events)
+        setDataSources(eventService.getAvailableProviders())
+      } catch (err) {
+        console.error('Error fetching events:', err)
+        setError('Failed to load events. Please try again.')
+        setEvents([])
+      } finally {
+        setLoading(false)
       }
-    })
+    }
 
-    setFilteredEvents(filtered)
-  }, [timeframe, zip, distance, router])
+    fetchEvents()
+  }, [zip, distance, router])
+
+  useEffect(() => {
+    if (events.length > 0) {
+      const filtered = eventService.getEventsByTimeframe(events, timeframe)
+      setFilteredEvents(filtered)
+    }
+  }, [events, timeframe])
 
   if (!zip || !distance) {
     return null
@@ -67,6 +74,11 @@ export default function EventsPage() {
               <p className="text-gray-600">
                 Within {distance} miles
               </p>
+              {dataSources.length > 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Sources: {dataSources.join(', ')}
+                </p>
+              )}
             </div>
             <button
               onClick={() => router.push('/')}
@@ -80,7 +92,24 @@ export default function EventsPage() {
         </div>
 
         <div className="space-y-4">
-          {filteredEvents.length === 0 ? (
+          {loading ? (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <div className="flex justify-center items-center space-x-2">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <p className="text-gray-600">Loading events...</p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <p className="text-red-600 mb-4">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : filteredEvents.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
               <p className="text-gray-500">No events found for the selected timeframe.</p>
             </div>

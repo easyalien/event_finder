@@ -4,6 +4,8 @@ import type {
   EventSearchParams, 
   EventSearchResult 
 } from '@/types/eventProvider'
+import { oauthManager } from '@/services/oauth/oauthManager'
+import { MeetupOAuthProvider } from '@/services/oauth/providers/meetupOAuth'
 
 interface MeetupEvent {
   id: string
@@ -56,14 +58,28 @@ export class MeetupProvider implements IEventProvider {
     pagination: true
   }
 
+  private meetupOAuth: MeetupOAuthProvider
+
+  constructor() {
+    this.meetupOAuth = new MeetupOAuthProvider()
+    oauthManager.registerProvider(this.meetupOAuth)
+  }
+
   async searchEvents(params: EventSearchParams): Promise<EventSearchResult> {
-    if (!this.isAvailable()) {
-      throw new Error('Meetup API access token is not configured')
+    const token = oauthManager.getToken('meetup')
+    
+    if (!token) {
+      console.warn('Meetup OAuth not connected. Using mock data.')
+      return {
+        events: this.getMockMeetupEvents(params),
+        totalCount: 3,
+        hasMore: false,
+        source: this.name
+      }
     }
 
-    // For now, return empty results with a note
-    // This demonstrates the architecture - actual implementation would need OAuth setup
-    console.warn('Meetup provider is configured but not fully implemented yet. OAuth setup required.')
+    // TODO: Implement real Meetup GraphQL API calls with OAuth token
+    console.warn('Meetup OAuth connected but real API implementation pending.')
     
     return {
       events: this.getMockMeetupEvents(params),
@@ -158,9 +174,15 @@ export class MeetupProvider implements IEventProvider {
   }
 
   isAvailable(): boolean {
-    // For demo purposes, return true. In production, check for OAuth token
-    return true
-    // return !!process.env.NEXT_PUBLIC_MEETUP_ACCESS_TOKEN
+    return true // Always available with fallback to mock data
+  }
+
+  isConnected(): boolean {
+    return oauthManager.isConnected('meetup')
+  }
+
+  getConnectionUrl(): string {
+    return oauthManager.getAuthUrl('meetup', '/events')
   }
 
   private getMockMeetupEvents(params: EventSearchParams): Event[] {

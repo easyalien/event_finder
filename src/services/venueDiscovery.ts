@@ -1,4 +1,6 @@
 import type { Venue, VenueSearchParams, VenueSearchResult } from '@/types/venue'
+import { oauthManager } from '@/services/oauth/oauthManager'
+import { FoursquareOAuthProvider } from '@/services/oauth/providers/foursquareOAuth'
 
 interface FoursquareVenue {
   fsq_id: string
@@ -47,7 +49,12 @@ interface FoursquareResponse {
 
 export class VenueDiscoveryService {
   private readonly baseUrl = 'https://api.foursquare.com/v3'
-  private readonly apiKey = process.env.NEXT_PUBLIC_FOURSQUARE_API_KEY
+  private foursquareProvider: FoursquareOAuthProvider
+
+  constructor() {
+    this.foursquareProvider = new FoursquareOAuthProvider()
+    oauthManager.registerProvider(this.foursquareProvider)
+  }
 
   // Foursquare category IDs for venues that typically host events
   private readonly eventVenueCategories = [
@@ -76,8 +83,10 @@ export class VenueDiscoveryService {
   ]
 
   async searchVenues(params: VenueSearchParams): Promise<VenueSearchResult> {
-    if (!this.isAvailable()) {
-      throw new Error('Foursquare API key is not configured')
+    const token = oauthManager.getToken('foursquare')
+    
+    if (!token) {
+      throw new Error('Foursquare OAuth token not available. Please connect your account.')
     }
 
     const searchParams = new URLSearchParams({
@@ -89,14 +98,15 @@ export class VenueDiscoveryService {
     })
 
     try {
-      const response = await fetch(`${this.baseUrl}/places/search?${searchParams}`, {
-        headers: {
-          'Authorization': this.apiKey!,
-          'Accept': 'application/json'
-        }
-      })
+      const response = await this.foursquareProvider.makeAuthenticatedRequest(
+        `${this.baseUrl}/places/search?${searchParams}`,
+        token
+      )
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Foursquare authentication expired. Please reconnect your account.')
+        }
         throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`)
       }
 
@@ -116,7 +126,11 @@ export class VenueDiscoveryService {
   }
 
   isAvailable(): boolean {
-    return !!this.apiKey
+    return oauthManager.isConnected('foursquare')
+  }
+
+  getConnectionUrl(): string {
+    return oauthManager.getAuthUrl('foursquare', '/events')
   }
 
   private transformVenue = (fsqVenue: FoursquareVenue): Venue => {
@@ -144,17 +158,17 @@ export class VenueDiscoveryService {
 
   // Helper method to get venue details if needed
   async getVenueDetails(venueId: string): Promise<FoursquareVenue | null> {
-    if (!this.isAvailable()) {
+    const token = oauthManager.getToken('foursquare')
+    
+    if (!token) {
       return null
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/places/${venueId}`, {
-        headers: {
-          'Authorization': this.apiKey!,
-          'Accept': 'application/json'
-        }
-      })
+      const response = await this.foursquareProvider.makeAuthenticatedRequest(
+        `${this.baseUrl}/places/${venueId}`,
+        token
+      )
 
       if (!response.ok) {
         return null
